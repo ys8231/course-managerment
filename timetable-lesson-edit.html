@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8 />
+    <title>排課表</title>
+    <link href="/content/shared/styles/examples.css" rel="stylesheet">
+    <link href="/course/styles/kendo.common.min.css" rel="stylesheet">
+    <link href="/course/styles/kendo.rtl.min.css" rel="stylesheet">
+    <link href="/course/styles/kendo.Default.min.css" rel="stylesheet" />
+    <link href="/course/styles/kendo.default.mobile.min.css" rel="stylesheet">
+    
+    <script src="js/jquery-3.6.0.min.js"></script>    
+    <script src="js/kendo.all.min.js"></script>    
+    <script src="js/kendo.timezones.min.js"></script>
+    <script src="/content/shared/js/console.js"></script>
+</head>
+<body> 
+<script type="module">
+import * as Sentry from "../course/node_modules/@sentry/browser";
+import { Integrations } from "../course/node_modules/@sentry/tracing";
+
+Sentry.init({
+  dsn: "https://c5e70831bd5f4644a345eefb0daf7f03@o1110454.ingest.sentry.io/6139498",
+  integrations: [new Integrations.BrowserTracing()],
+
+  // Set tracesSampleRate to 1.0 to capture 100%
+  // of transactions for performance monitoring.
+  // We recommend adjusting this value in production
+  tracesSampleRate: 1.0,
+});
+
+try {
+  aFunctionThatMightFail();
+} catch (err) {
+  Sentry.captureException(err);
+}
+</script>
+
+<script>
+window.onerror = (msg, url, line, col, error) => {
+console.log('onerror')
+// TODO
+}
+var today = new Date();
+var dd = String(today.getDate()).padStart(2, '0');
+var mm = String(today.getMonth() + 1).padStart(2, '0');
+var yyyy = today.getFullYear();
+today = yyyy + '/' + mm + '/' + dd; 
+//document.write(today);
+</script>
+
+<div id="example">
+   <div id="team-schedule">
+    <div id="people">
+    <input type="hidden" id="低年級" value="1">
+    <input type="hidden" id="高年級" value="2">
+    <input type="hidden" id="中學" value="3">
+    </div>
+  </div>
+  班級篩選：<input type="text" id="comboBox" name="comboBox" /><br />
+  <div id="scheduler"></div>
+  </div>
+  <script id="event-template" type="text/x-kendo-template">
+  <div class="movie-template"> 
+  #: kendo.toString(start, "hh:mm") # - #: kendo.toString(end, "hh:mm") #
+  <br />
+  #: title #
+  <br />
+  #: gradeId #
+  <br />
+  #: description #  
+  </div>
+  </script>
+  <script id="customEditorTemplate" type="text/x-kendo-template">
+    <div class="kd-example-console">
+      <div class="header">
+          <span class="title">CONSOLE LOG</span>
+          <span class="clear kd-text-secondary">Clear log</span>
+      </div>
+      <div class="console"></div>
+    </div>
+  <div class="k-edit-label"><label for="title">查詢領域</label></div>
+  <div data-container-for="subject" class="k-edit-field">
+    <input type="text" id="subject" class="k-textbox" name="subject" style="width: 80%">
+  </div>
+  <div class="k-edit-label"><label for="title">查詢課目</label></div>
+  <div data-container-for="lesson" class="k-edit-field">
+    <input type="text" id="lesson" class="k-textbox" name="lesson" style="width: 80%">
+  </div>  
+  <div class="k-edit-label"><label for="title">課目</label></div>
+  <div data-container-for="title" class="k-edit-field">
+    <input type="text" id="title" class="k-textbox" name="title" required="required" data-bind="value:title" style="width: 80%">
+  </div> 
+  <div class="k-edit-label">
+    <label for="start">開始</label>
+  </div>
+  <div data-container-for="start" class="k-edit-field">
+    <input type="text"
+       data-role="datetimepicker"
+       data-interval="30"
+       data-type="date"
+       data-bind="value:start,invisible:isAllDay"
+       name="start" style="width: 80%"/>
+    <input type="text" data-type="date" data-role="datepicker" data-bind="value:start,visible:isAllDay" name="start" style="width: 80%"/>
+    <span data-bind="text: startTimezone"></span>
+    <span data-for="start" class="k-invalid-msg" style="display: none;"></span>
+  </div>
+  <div class="k-edit-label"><label for="end">結束</label></div>
+  <div data-container-for="end" class="k-edit-field">
+    <input type="text" data-type="date" data-role="datetimepicker" data-bind="value:end,invisible:isAllDay" name="end" data-datecompare-msg="End date should be greater than or equal to the start date" style="width: 80%"/>
+    <input type="text" data-type="date" data-role="datepicker" data-bind="value:end,visible:isAllDay" name="end" data-datecompare-msg="End date should be greater than or equal to the start date" style="width: 80%"/>
+    <span data-bind="text: endTimezone"></span>
+    <span data-bind="text: startTimezone, invisible: endTimezone"></span>
+    <span data-for="end" class="k-invalid-msg" style="display: none;"></span>
+  </div>
+  <div class="k-edit-label"><label for="isAllDay">All day event</label></div>
+  <div data-container-for="isAllDay" class="k-edit-field">
+    <input type="checkbox" name="isAllDay" data-type="boolean" data-bind="checked:isAllDay">
+  </div>
+  <div class="k-edit-label"><label for="recurrenceRule">重複</label></div>
+  <div data-container-for="recurrenceRule" class="k-edit-field">
+    <div data-bind="value:recurrenceRule" name="recurrenceRule" data-role="recurrenceeditor"></div>
+  </div>
+  <div class="k-edit-label"><label for="student">選擇學生</label></div>
+  <div data-container-for="student" class="k-edit-field">
+    <input type="text" id="student" class="k-textbox" name="student" style="width: 80%">
+  </div>   
+  <div class="k-edit-label"><label for="description">學生</label></div>
+  <div data-container-for="description" class="k-edit-field">
+    <textarea id="description" name="description" data-bind="value:description" class="k-textbox" style="width: 100%"></textarea>
+  </div>  
+    <!-- Trigger/Open The Modal -->
+    <div data-container-for="choose" class="k-edit-field">
+    <button id="myBtn" class="k-button">學生名單</button>
+    <A HREF="student_list.html" onClick="return popup(this, 'notes')"><button class="k-button">學生名單</button></A>
+    </div>
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+        <div class="modal-header">
+        <span class="close">&times;</span>
+        <h2>學生名單</h2>
+        </div>
+        <div class="modal-body">
+            <h4>一年級</h4>
+            <p>黃園芯,蔡溍家,王庭謙,劉庭安,莊千依,林政宇,羅煒程,羅煒庭,顏伯蓉,傅芊樺,陳盈樵</p>
+            <h4>二年級</h4>
+            <p>鄧以愛,李大群,簡秭彤,鄭苡妡,李炳誠,王子揚,吳禹,蔡宛憍</p>
+            <h4>三年級</h4>
+            <p>顏鴻旭,鄧以恩,顏伯丞,游蓓恩,吳羽潼,吳長恩,林于宸,陳渝瑾,莊研一,黃佳宜,陳暐昕,楊媗婷,鄭叡均</p>            
+            <h4>四年級</h4>            
+            <p>陳昱瑞,溫孟修,郭俊諒,李映群</p>          
+            <h4>五年級</h4>            
+            <p>黃康翔,吳博庭,洪佩玹,許喬恩,郭佩芸</p>             
+            <h4>六年級</h4>            
+            <p>洪佩洵,陳昱蓁,洪喬嬉,郭俊德,劉文曦,張棠閎</p> 
+        </div>
+        <div class="modal-footer">
+        <p>建立日期：2022-01-06</p>
+        </div>
+    </div> 
+    </div>  
+  <div class="k-edit-label"><label for="gradeId">年級</label></div>
+  <div data-container-for="gradeId" class="k-edit-field">
+    <select id="gradeId" data-bind="value:gradeId" data-role="dropdownlist"
+            data-value-field="value" data-text-field="text" multiple="multiple">
+    <option value="無">無</option>
+    <option value="一年級">一年級</option>
+    <option value="二年級">二年級</option>
+    <option value="三年級">三年級</option>
+    <option value="四年級">四年級</option>
+    <option value="五年級">五年級</option>
+    <option value="六年級">六年級</option>
+    <option value="低年級">低年級</option>
+    <option value="高年級">高年級</option>   
+  </select>
+  </div>
+  <div class="k-edit-label"><label for="ownerId">班別</label></div>
+  <div data-container-for="ownerId" class="k-edit-field">
+    <select id="ownerId" data-bind="value:ownerId" data-role="dropdownlist"
+            data-value-field="value" data-text-field="text">
+    <option value="1">低年級</option>
+    <option value="2">高年級</option>
+    <option value="3">中學</option>
+  </select>
+  </div> 
+  </script>  
+    <script>     
+    $(document).ready(function () { 
+    var ctrlKey = false;
+    var scheduler = $("#scheduler").kendoScheduler({
+    toolbar: [ "search" ],
+    date: new Date(today),
+    startTime: new Date("2021/12/22 08:00 AM"),
+    height: 700,
+    views: [
+      "day",
+      { type: "workWeek", selected: true, eventHeight: "auto" },
+      "week",
+      "month",
+      "agenda"
+    ],
+    moveEnd: function(e) {
+      if (ctrlKey) {
+      e.preventDefault(); 
+      var newEvent = e.event.clone({
+        start: e.start,
+        end: e.end,
+      }); 
+      this.dataSource.add(newEvent);
+      this.dataSource.sync();
+      }
+    },
+    editable: {
+      template: $("#customEditorTemplate").html(),
+    },
+    eventTemplate: $("#event-template").html(),
+    edit: function(e) {
+      //e.event.set('description', studentList);
+      var recurrenceEditor = e.container.find("[data-role=recurrenceeditor]").data("kendoRecurrenceEditor");
+      // Set the start option value. Used to define the week 'Repeat on' selected checkboxes.
+      recurrenceEditor.setOptions({
+        start: new Date(e.event.start)
+      });
+      
+      //Subject下拉式選單
+      $("#subject").kendoDropDownList({
+            optionLabel: "請選擇領域...",
+            dataTextField: "SubjectName",
+            dataValueField: "SubjectID",
+            height: 310,            
+            dataSource: {
+            serverFiltering: true,
+            transport: {
+                        read: {
+                        dataType: "json",
+                        url: "subject_pdo.php?type=read",
+                            }
+                        }
+        },              
+        }).data("kendoDropDownList");
+      //Lesson下拉式選單
+      $("#lesson").kendoDropDownList({
+      autoBind: true,
+      cascadeFrom: "subject",
+      optionLabel: "請選擇課目...",
+      dataTextField: "LessonName",
+      dataValueField: "LessonName",
+      /**
+      change: function(e) {
+      
+              var lessonValue = this.value();
+              var titleInput = document.getElementById("title"); 
+              titleInput.value = lessonValue;              
+              //$('#title').val(lessonValue);
+            },         
+      */
+      filter:'contains', //加入搜尋框      
+      dataSource: {
+      transport: {
+            read: {
+            dataType: "json",
+            url: "lesson_pdo_join.php?type=read",
+              }
+            },
+            group: { field: "UnitName" }
+          } 
+        }).data("kendoDropDownList");
+
+      //Title下拉式選單      
+      $("#title").kendoDropDownList({
+      autoBind: true,
+      optionLabel: "請選擇課目...",
+      dataTextField: "LessonName",
+      dataValueField: "LessonName", 
+      filter:'contains', //加入搜尋框      
+      dataSource: {
+      transport: {
+            read: {
+            dataType: "json",
+            url: "lesson_pdo_join.php?type=read",
+              }
+            },
+            group: { field: "UnitName" }
+          } 
+        }).data("kendoDropDownList");
+      //Student欄位Events
+      function onDataBound() {
+          if ("kendoConsole" in window) {
+              kendoConsole.log("event: dataBound");
+          }
+      }
+      function onOpen() {
+          if ("kendoConsole" in window) {
+              kendoConsole.log("event: open");
+          }
+      }
+      function onClose() {
+          if ("kendoConsole" in window) {
+              kendoConsole.log("event: close");
+          }
+      }
+      function onChange() {
+          if ("kendoConsole" in window) {
+              kendoConsole.log("event: change");
+          }
+      }
+      function onSelect(e) {
+          if ("kendoConsole" in window) {
+              var dataItem = e.dataItem;
+              kendoConsole.log("event :: select (" + dataItem.text + " : " + dataItem.value + ")" );
+          }
+      };
+      function onDeselect(e) {
+          if ("kendoConsole" in window) {
+              var dataItem = e.dataItem;
+              kendoConsole.log("event :: deselect (" + dataItem.text + " : " + dataItem.value + ")" );
+          }
+      };
+      function onFiltering(e) {
+          if ("kendoConsole" in window) {
+              kendoConsole.log("event :: filtering");
+          }
+      }
+      //檢查學生欄位資料輸入時，發生的事件。
+      //發現選擇學生下拉式選單傳入的學生姓名，雖然出現在欄位中，但是該欄位並沒有發生input事件。
+      //需要插入點置入該欄位中，然後按Enter鍵後，才會發生input事件。
+      var element = document.getElementById('description');
+      element.addEventListener('input', function() {
+        kendoConsole.log('The value is now ' + element.value);
+      });
+      var event = new Event('input', {
+          bubbles: true,
+          cancelable: true,
+      });
+      element.dispatchEvent(event);
+
+        //學生下拉式選單      
+      $("#student").kendoMultiSelect({
+        autoClose: false,
+        autoBind: true,
+        valuePrimitive: true,
+        optionLabel: "請選擇學生...",
+        dataTextField: "StudentName",
+        dataValueField: "StudentName", 
+        filter:'contains', //加入搜尋框
+        dataBound: onDataBound,
+        filtering: onFiltering,
+        deselect: onDeselect,
+        select: onSelect,
+        change: onChange,
+        close: onClose,
+        open: onOpen,
+        //downArrow: 'showArrow',      
+        dataSource: {
+        transport: {
+            read: {
+            dataType: "json",
+            url: "student_pdo.php?type=read",
+              }
+            },
+            group: { field: "Grade" },
+            schema: {
+            model: {
+            id: "StudentID",
+            fields: {
+            StudentID: { type: "number", editable: false },
+            StudentName: { type: "string" }        
+        }
+        }
+        }
+          }        
+        }).data("kendoMultiSelect");
+
+        //選擇學生下拉式選單取得學生欄位的學生名單
+        var multiSelect = $("#student").data("kendoMultiSelect");
+        var str = $("#description").val();
+        strCopy = str.split(",");
+        multiSelect.value( strCopy );
+        //學生下拉式選單自動填入學生資料至description欄位中
+        //但是更新之後(Press Save)，學生資料沒有變更，
+        //必須在description欄位中按Enter鍵才可以更新。
+        //在沒有更新網頁的情狀下，Student欄位也可以保留學生名單，
+        //網頁更新後，Student欄位就不會顯示學生名單，此時Student欄位就所以不宜用來變更大量的學生名單。
+        $('#student').on("change", function () {
+              $("#description").val(multiSelect.value());
+              $("#description").trigger('change');                            
+        });       
+        //Bootstrap Popup Modal 程式碼
+        // Get the modal
+        var modal = document.getElementById("myModal");        
+        // Get the button that opens the modal
+        var btn = document.getElementById("myBtn");        
+        // Get the <span> element that closes the modal
+        var span = document.getElementsByClassName("close")[0];        
+        // When the user clicks on the button, open the modal
+        btn.onclick = function() {
+        modal.style.display = "block";
+        }        
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function() {
+        modal.style.display = "none";
+        }        
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+        }        
+    },
+   
+    //End 自訂Event編輯器相關程式碼    
+    timezone: "Asia/Taipei",
+    dataSource: {
+      batch: true,
+    transport: {
+    read: {
+    url: "timetable_pdo_v7.php?type=read",
+    dataType: "json",
+    contentType: "application/json",
+    type: "POST"
+    },
+    update: {
+    url: "timetable_pdo_v7.php?type=update",
+    dataType: "json",
+    contentType: "application/json",
+    type: "POST"
+    },
+    create: {
+    url: "timetable_pdo_v7.php?type=create",
+    dataType: "json",
+    contentType: "application/json",
+    type: "POST"
+    },
+    destroy: {
+    url: "timetable_pdo_v7.php?type=destroy",
+    dataType: "json",
+    contentType: "application/json",
+    type: "POST"
+    },
+    parameterMap: function(data) {
+    return kendo.stringify(data);
+    }
+    }, 
+    schema: {
+      timezone: "Asia/Taipei",
+      model: {
+        id: "taskId", //必須設定為下方的fields(欄位)名稱taskId
+        fields: {
+          taskId: { from: "TaskID", type: "number" },
+          title: { from: "Title", defaultValue: "", validation: { required: true } },
+          description: { from: "Student" },
+          start: { type: "date", from: "Start" },
+          end: { type: "date", from: "End" },
+          startTimezone: { from: "StartTimezone" },
+          endTimezone: { from: "EndTimezone" },          
+          recurrenceId: { from: "RecurrenceID" },
+          recurrenceRule: { from: "RecurrenceRule" },
+          recurrenceException: { from: "RecurrenceException" },
+          gradeId: { from: "Grade" ,defaultValue: "無" },
+          ownerId: { from: "OwnerID", defaultValue: 1 },         
+          isAllDay: { type: "boolean", from: "IsAllDay"}
+        }
+      }
+    },
+  filter: {
+  logic: "or",
+  filters: [
+  { field: "ownerId", operator: "eq", value: 1 },
+  { field: "ownerId", operator: "eq", value: 2 },
+  { field: "ownerId", operator: "eq", value: 3 } 
+  ]
+  }
+},
+    resources: [
+    {
+      field: "ownerId",
+      title: "Owner",
+      dataSource: [
+        { text: "低年級", value: 1, color: "#f8a398" },
+        { text: "高年級", value: 2, color: "#51a0ed" },
+        { text: "中學", value: 3, color: "#56ca85" }
+      ]
+    }
+    ]
+    }).data("kendoScheduler");
+
+    //依照班別分類來篩選日曆中的課表    
+    $("#comboBox").kendoComboBox({
+      dataTextField: "text",
+      dataValueField: "value",
+      change: function(e) {
+        var value = this.value();
+        if (value) {
+          scheduler.dataSource.filter({
+            operator: function(task) {
+              var result = false;
+              if (task.ownerId == value) {
+                result = true;
+              }
+              return result;
+            }
+          });
+        } else
+          scheduler.dataSource.filter([])
+      },
+      dataSource: {
+      data: [
+        { text: "低年級", value: 1},
+        { text: "高年級", value: 2},
+        { text: "中學", value: 3}
+      ]
+      }
+    });
+    
+     //載入 kendoTooltip 提示文字，內容設定在下方程式碼。
+    $(function () {
+      $("#scheduler").kendoTooltip({
+        filter: ".k-event > div",  
+        position: "top",
+        width: 250,
+        content: kendo.template($('#template').html())
+      });
+      /**
+      $("#scheduler").kendoTooltip({
+        filter: ".k-scheduler-content td[role=gridcell]",
+        position: "top",
+        width: 250,
+        content: kendo.template($('#slotTemplate').html())
+      });
+      */
+    });
+
+    //複製事件
+    $(document)
+     .on("keydown", function(e) {
+      ctrlKey = e.ctrlKey;
+     })
+     .on("keyup", function(e) {
+      ctrlKey = e.ctrlKey;
+     });   
+  });
+  </script>
+
+  <!-- kendoTooltip 提示文字的 template 內容程式碼。 -->
+   <script id="template" type="text/x-kendo-template">
+    #var uid = target.parent().attr("data-uid");#
+    #var scheduler = target.closest("[data-role=scheduler]").data("kendoScheduler");#
+    #var model = scheduler.occurrenceByUid(uid);#
+
+    #if(model) {#
+      時間: #=kendo.format('{0:hh:mm}',model.start)# -
+       #=kendo.format('{0:hh:mm tt}',model.end)#<br />
+      課目: #=model.title#<br />
+      學生: #=model.description#<br />
+      年級: #=model.gradeId#<br />
+    #} else {#
+      No event data is available
+    #}#    
+  </script>
+  <script>
+    //popup Window 程式碼
+    function popup(mylink, windowname) { 
+        if (! window.focus)return true; 
+        var href; 
+        if (typeof(mylink) == 'string') href=mylink; 
+        else href=mylink.href; 
+        window.open(href, windowname, 'width=600,height=400,scrollbars=yes'); 
+        return false; 
+    }
+    </script>
+    <script>
+        // Get the modal
+    var modal = document.getElementById("myModal");    
+    // Get the button that opens the modal
+    var btn = document.getElementById("myBtn");    
+    // Get the <span> element that closes the modal
+    var span = document.getElementsByClassName("close")[0];    
+    // When the user clicks on the button, open the modal
+    btn.onclick = function() {
+      modal.style.display = "block";
+    }    
+    // When the user clicks on <span> (x), close the modal
+    span.onclick = function() {
+      modal.style.display = "none";
+    }    
+    // When the user clicks anywhere outside of the modal, close it
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+    </script>
+<style>
+.k-button {
+    border-radius: 4px;
+    border-color: #bbb;
+    color: #2e2e2e;
+    background-color: #eff8e8;
+}
+.k-i-close {
+    top: 0% !important; 
+    margin: -8px 0 0;
+    position: relative !important;
+}
+
+.k-i-x {
+    top: 0% !important;
+    margin: -8px 0 0;
+    position: relative !important;
+}
+
+  .k-nav-current > .k-link span + span {
+    max-width: 200px;
+    display: inline-block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    vertical-align: top;
+  }
+
+  #team-schedule {
+    background: url('../content/web/scheduler/team-schedule.png') transparent no-repeat;
+    height: 115px;
+    position: relative;
+  }
+
+  #people {
+    background: url('../content/web/scheduler/scheduler-people.png') no-repeat;
+    width: 345px;
+    height: 115px;
+    position: absolute;
+    right: 0;
+  }
+  #alex {
+    position: absolute;
+    left: 4px;
+    top: 81px;
+  }
+  #bob {
+    position: absolute;
+    left: 119px;
+    top: 81px;
+  }
+  #charlie {
+    position: absolute;
+    left: 234px;
+    top: 81px;
+  }
+  .selected-value {
+  display: inline-block;
+  vertical-align: middle;
+  width: 24px;
+  height: 24px;
+  background-size: 100%;
+  margin-right: 5px;
+  border-radius: 50%;
+  }
+  .k-popup > .k-group-header, .k-popup > .k-virtual-wrap > .k-group-header {
+    background: #000000;
+    color: #fff;
+  }
+  .k-popup .k-list .k-item > .k-group {
+    background: #490303;
+    color: #fff;
+  }
+/* The Modal (background) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 2; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgb(0,0,0); /* Fallback color */
+  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content */
+.modal-content {
+  position: relative;
+  background-color: #fefefe;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #888;
+  width: 86%;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+  animation-name: animatetop;
+  animation-duration: 0.4s
+}
+
+/* The Close Button */
+.close {
+  color: rgb(255, 255, 255);
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+ /* Modal Header */
+ .modal-header {
+  padding: 2px 16px;
+  background-color: #5cb85c;
+  color: white;
+}
+
+/* Modal Body */
+.modal-body {padding: 2px 16px;}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 2px 16px;
+  background-color: #5cb85c;
+  color: white;
+}
+
+/* Add Animation */
+@keyframes animatetop {
+  from {top: -300px; opacity: 0}
+  to {top: 0; opacity: 1}
+}
+  </style>
+  </body>
+  </html>

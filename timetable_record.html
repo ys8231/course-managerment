@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=utf-8 />
+    <title>排課表</title>
+    <link href="/course/styles/kendo.common.min.css" rel="stylesheet">
+    <link href="/course/styles/kendo.rtl.min.css" rel="stylesheet">
+    <link href="/course/styles/kendo.default.min.css" rel="stylesheet" />
+    <link href="/course/styles/kendo.default.mobile.min.css" rel="stylesheet">
+    
+    <script src="js/jquery.min.js"></script>    
+    <script src="js/kendo.all.min.js"></script>    
+    <script src="js/kendo.timezones.min.js"></script>
+    <script src="kendo.messages.zh-TW.js"></script>
+   
+</head>
+<body> 
+    <div id="grid"></div>
+<script>
+$(document).ready(function () {
+		kendo.data.binders.widget.commaseparatedvalue = kendo.data.Binder.extend({
+		init: function (widget, bindings, options) {
+			kendo.data.Binder.fn.init.call(this, widget.element[0], bindings, options);
+			this.widget = widget;
+			this._change = $.proxy(this.change, this);
+			this.widget.bind("change", this._change);
+		},
+		refresh: function () {
+			var value = this.bindings.commaseparatedvalue.get();
+			var values = value ? value.split(",") : [];
+
+			this.widget.value(values);
+		},
+		change: function () {
+			var value = this.widget.value();
+			this.bindings.commaseparatedvalue.set(value.join(","));
+		},
+		destroy: function () {
+			this.widget.unbind("change", this._change);
+		}
+	});
+//Start Grid dataSource
+var dataSource = new kendo.data.DataSource({
+transport: {
+read: {
+url: "timetable_record_pdo.php?type=read",
+dataType: "json",
+contentType: "application/json",
+type: "POST"
+},
+update: {
+url: "timetable_record_pdo.php?type=update",
+dataType: "json",
+contentType: "application/json",
+type: "POST"
+},
+destroy: {
+url: "timetable_record_pdo.php?type=destroy",
+dataType: "json",
+contentType: "application/json",
+type: "POST"
+},
+create: {
+url: "timetable_record_pdo.php?type=create",
+dataType: "json",
+contentType: "application/json",
+type: "POST"
+},
+parameterMap: function(data) {
+return kendo.stringify(data);
+}
+},
+batch: true,
+pageSize: 10,
+schema: {
+model: {
+id: "TaskID",
+fields: {
+TaskID: { type: "number", editable: false },
+Lesson: { type: "number" },
+Topic: { type: "string" },
+Start: { type: "date" },
+Student: { type: "string" },
+Grade: { type: "string" },
+Note: { type: "string" },
+Finish: { type: "boolean" }
+}
+}
+}
+});
+//End Grid dataSource
+$("#grid").kendoGrid({
+dataSource: dataSource,
+height: 800,
+toolbar: ["search"],
+search: { fields: ["Student","Lesson"] },
+groupable: true,
+sortable: true,
+filterable: true, 
+editable: "inline",
+pageable: { refresh: true, pageSizes: true, buttonCount: 10 },
+columns: [
+{ field: "Lesson", width: "300px", dataTextField: "LessonName", dataValueField: "LessonID", group: { field: "UnitName" }, dataSource: {
+type: "json",
+transport: {
+read: {
+dataType: "json",
+url: "lesson_pdo_join.php?type=read"}
+}
+}, title: "課目" },
+{ field: "Topic", title: "主題", width: 100 },
+{ field: "Start", title: "日期", format: "{0:yyyy-MM-dd}", width: 180},
+{ field: "Grade", title: "年級", width: 110},
+{ field: "Student", title: "學生", width: 300, editor: multiselectEditor},
+{ field: "Note", title: "觀察註記", width: 300 },
+{ field: "Finish", title: "完成", type: "boolean", width: 80},
+{ command: ["edit", "destroy"], title: "&nbsp;" }
+]
+});
+//學生下拉式選單
+function multiselectEditor(container, options) {
+$("<select data-bind='commaseparatedvalue: " + options.field + "'/>")
+.appendTo(container)
+.kendoMultiSelect({
+valuePrimitive: true,
+autoClose: false,
+autoBind: true,
+id: "selects",
+groupTemplate: "<strong>#:data#</strong>", 
+dataTextField: "StudentName",
+dataValueField: "StudentName",
+filter:'contains',
+dataSource:{
+transport: {
+read: {
+dataType: "json",
+url: "student_pdo.php?type=read",
+}
+},
+group: { field: "Grade" },
+schema: {
+model: {
+id: "StudentID",
+fields: {
+StudentID: { type: "number", editable: false },
+StudentName: { type: "string" }
+
+}
+}
+}
+},
+});
+}
+//Select All MultiSelect Items by Clicking the Group
+$(".k-list-scroller").delegate(".k-group", "click", groupClick);
+$(".k-list-container").delegate(".k-group-header", "click", groupClick);
+
+function groupClick() {
+var ms = $("#selects").data("kendoMultiSelect"); //#selects 是選單欄位的ID
+var data = ms.dataSource.data();
+var msValue = [];
+
+for (var i = 0; i < data.length; i++) {
+if (data[i].GradeID == this.textContent) {
+msValue.push(data[i].StudentName);
+}
+}
+ms.value(msValue);
+ms.close();
+}
+ var customers = $("#selects").data("kendoMultiSelect"); customers.wrapper.attr("id", "customers-wrapper");
+});
+	
+//Finish核取方塊
+$("#grid .k-grid-content").on("change", "input.chkbx", function(e) {
+		var grid = $("#grid").data("kendoGrid"),
+			dataItem = grid.dataItem($(e.target).closest("tr"));
+
+		dataItem.set("Finish", this.checked);
+		});
+
+		function dirtyField(data, fieldName){
+		var hasClass = $("[data-uid=" + data.uid + "]").find(".k-dirty-cell").length < 1;
+		if(data.dirty && data.dirtyFields[fieldName] && hasClass){
+			return "<span class='k-dirty'></span>"
+		}
+		else{
+			return "";
+		}
+		}
+
+</script>
+<style>
+button {
+	background: #0e0b22;
+	color: #fff;
+	padding: 0.4rem;
+	margin-top: 20px;
+	border: none;
+	border-radius: 4px;
+	}
+
+button:hover {
+	cursor: pointer;
+	background: #1e1d25;
+	}
+
+button.blue {
+	background-color: #3498db;
+}
+
+button.green {
+	background-color: #2ecc71;
+}
+
+button.orange {
+	background-color: orangered;
+}
+input[type="text"]:not(.form-control) {
+padding: 0.5rem 0.75rem 0.5rem 0.0rem;
+}
+</style>
+  </body>
+  </html>
